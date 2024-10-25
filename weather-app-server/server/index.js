@@ -15,30 +15,57 @@ client.connect(err =>{
     }
 })
 
-app.get("/cities", async (req,res) =>{
+app.get("/locations/:location", async (req, res) => {
+    const location = req.params.location;
+    
     try {
-        const result = await client.query("SELECT * FROM cities")
-        res.json(result.rows)
+        
+        const resultVillage = await client.query("SELECT * FROM villages WHERE name = $1", [location]);
+        const isExistVillageName = resultVillage.rows[0];
+
+        if (isExistVillageName) {
+            const districtId = isExistVillageName.ilce_id;
+            const districtResult = await findDistrict(districtId);
+            const cityResult = await findCity(districtResult.rows[0].il_id);
+
+            if (districtResult.rows.length > 0 && cityResult.rows.length > 0) {
+                return res.send(`Girilen Köyü İli : ${cityResult.rows[0].name} İlçesi : ${districtResult.rows[0].name}`);
+            } else {
+                return res.status(404).send("İl veya ilçe bulunamadı.");
+            }
+        } 
+
+      
+        const resultDistrict = await client.query("SELECT * FROM districts WHERE name = $1", [location]);
+        const isExistDistrict = resultDistrict.rows[0];
+
+        if (isExistDistrict) {
+            const cityResult = await findCity(isExistDistrict.il_id); 
+            if (cityResult.rows.length > 0) { 
+                return res.send(`Girilen İlçenin Bağlı Olduğu İl : ${cityResult.rows[0].name}`);
+            } else {
+                return res.status(404).send("Şehir bulunamadı.");
+            }
+        }
+
+       
+        res.status(404).send("Belirtilen konum bulunamadı.");
+
     } catch (error) {
-        console.log("Error",error.stack)
+        console.error(error);
+        res.status(500).send("Sunucu hatası.");
     }
-})
-app.get("/districts", async (req,res) =>{
-    try {
-        const result = await client.query("SELECT * FROM districts")
-        res.json(result.rows)
-    } catch (error) {
-        console.log("Error",error.stack)
+
+    async function findDistrict(id) {
+        return await client.query("SELECT * FROM districts WHERE id = $1", [id]);
     }
-})
-app.get("/villages", async (req,res) =>{
-    try {
-        const result = await client.query("SELECT * FROM villages")
-        res.json(result.rows)
-    } catch (error) {
-        console.log("Error",error.stack)
+
+    async function findCity(id) {
+        return await client.query("SELECT * FROM cities WHERE id = $1", [id]);
     }
-})
+});
+
+
 
 
 
