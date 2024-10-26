@@ -1,10 +1,13 @@
 const express = require("express");
 const client = require("./config/db.js")
 const cors = require("cors")
+const axios = require("axios")
 
 const app = express();
 
 app.use(cors());
+
+const API_KEY = "6dc23fd4483549f3992131500230707";
 
 client.connect(err =>{
     if (err) {
@@ -29,7 +32,8 @@ app.get("/locations/:location", async (req, res) => {
             const cityResult = await findCity(districtResult.rows[0].il_id);
 
             if (districtResult.rows.length > 0 && cityResult.rows.length > 0) {
-                return res.send(`Girilen Köyü İli : ${cityResult.rows[0].name} İlçesi : ${districtResult.rows[0].name}`);
+                const response = await getWeatherInfo(cityResult.rows[0].name)
+                return res.send(response);
             } else {
                 return res.status(404).send("İl veya ilçe bulunamadı.");
             }
@@ -42,7 +46,9 @@ app.get("/locations/:location", async (req, res) => {
         if (isExistDistrict) {
             const cityResult = await findCity(isExistDistrict.il_id); 
             if (cityResult.rows.length > 0) { 
-                return res.send(`Girilen İlçenin Bağlı Olduğu İl : ${cityResult.rows[0].name}`);
+                const response = await getWeatherInfo(cityResult.rows[0].name)
+               
+                return res.send(response);
             } else {
                 return res.status(404).send("Şehir bulunamadı.");
             }
@@ -63,8 +69,18 @@ app.get("/locations/:location", async (req, res) => {
     async function findCity(id) {
         return await client.query("SELECT * FROM cities WHERE id = $1", [id]);
     }
+
+    
 });
 
+async function getWeatherInfo(location) {
+    const response = await axios.get(`https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${location}`)
+    if (response) {
+        console.log(response.data)
+        return response.data
+    }
+    
+}
 
 
 
