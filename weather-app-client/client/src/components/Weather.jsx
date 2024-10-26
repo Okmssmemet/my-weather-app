@@ -1,22 +1,24 @@
 import React, { useState, useEffect } from "react";
 import weatherData from "../api/WeatherData";
+import AutoComplete from "./AutoComplete";
 
 function Weather() {
     const [valueInput, setValueInput] = useState("");
     const [weatherResult, setWeatherResult] = useState(null);
-
-    const handleChange = (event) => {
-        setValueInput(event.target.value);
-    };
+    const [loading, setLoading] = useState(false);
 
     const handleSubmit = async () => {
+        setLoading(true);  // Veri çekmeye başlamadan önce yükleniyor durumuna geç
         const data = await weatherData(valueInput);
         if (data) {
-            setWeatherResult(data); // Array'e çevirmeden tekil veri olarak set ettik
+            setWeatherResult(data); // API'den gelen veriyi set ettik
+        } else {
+            setTimeout(() => {
+                alert("Böyle Bir Lokasyon Bulunmuyor");    
+            }, 2000);
+            
         }
-        else{
-            alert("Böyle Bir Lokasyon Bulunmuyor")
-        }
+        setLoading(false);  // Veri geldikten sonra yükleniyor durumunu kapat
     };
 
     return (
@@ -26,70 +28,38 @@ function Weather() {
         >
             <section className="grid min-h-[600px] w-full max-w-md rounded-2xl bg-white bg-gradient-to-tl from-purple-800 via-violet-900 to-purple-800 p-6">
                 <div className="flex h-full flex-col gap-y-5 rounded-2xl text-violet-100">
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
                     {/* Search Bar */}
-                    <div className="relative flex items-center gap-x-2">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="lucide lucide-search absolute left-4 h-5 w-5 text-violet-800"
-                        >
-                            <circle cx="11" cy="11" r="8" />
-                            <path d="m21 21-4.3-4.3" />
-                        </svg>
-
-                        <input
-                            className="w-full rounded-full bg-purple-300 placeholder:text-violet-800/50 py-3 pl-11 pr-4 text-violet-800 outline-none focus:ring-0"
-                            placeholder="Search"
-                            value={valueInput}
-                            onChange={handleChange}
-                        />
-                        <button
-                            className="grid aspect-square h-12 w-12 place-items-center rounded-full bg-violet-600 outline-none transition-colors duration-200 ease-in-out hover:bg-violet-500"
-                            onClick={handleSubmit}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="lucide lucide-chevron-right h-5 w-5"
-                            >
-                                <path d="m9 18 6-6-6-6" />
-                            </svg>
-                        </button>
+                    <AutoComplete 
+                        onEnterPress={(value) => {
+                            setValueInput(value); // Gelen değeri valueInput'a set ediyoruz
+                            handleSubmit(); // handleSubmit fonksiyonunu çağırıyoruz
+                        }}
+                    />
                     </div>
-
                     {/* Date and Time */}
                     <header className="date space-y-2 text-xl font-medium tracking-tighter">
                         <h1>
-                            {weatherResult
-                                ? new Date(weatherResult.location.localtime).toLocaleDateString("en-GB", {
-                                      weekday: "short",
-                                      day: "2-digit",
-                                      month: "short",
-                                  })
-                                : "Waiting Location..."}
+                            {loading
+                                ? "Yükleniyor..."
+                                : weatherResult
+                                    ? new Date(weatherResult.location.localtime).toLocaleDateString("en-GB", {
+                                        weekday: "short",
+                                        day: "2-digit",
+                                        month: "short",
+                                    })
+                                    : "Waiting Location..."}
                         </h1>
                         <p className="text-5xl font-extrabold">
                             <time className="time">
-                                {weatherResult
-                                    ? new Date(weatherResult.location.localtime).toLocaleTimeString([], {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                      })
-                                    : "--:--"}
+                                {loading
+                                    ? "--:--"
+                                    : weatherResult
+                                        ? new Date(weatherResult.location.localtime).toLocaleTimeString([], {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                        })
+                                        : "--:--"}
                             </time>
                         </p>
                     </header>
@@ -98,10 +68,18 @@ function Weather() {
                     <main className="b relative flex-1">
                         <div className="text-center space-y-4 pt-5 mt-5">
                             <h2 className="font-bold text-3xl">
-                                {weatherResult ? weatherResult.location.name : "Location"}
+                                {loading
+                                    ? "Yükleniyor..."
+                                    : weatherResult
+                                        ? weatherResult.location.name
+                                        : "Location"}
                             </h2>
                             <h3 className="font-extrabold text-5xl">
-                                {weatherResult ? `${Math.floor(weatherResult.current.temp_c)}°C` : "--°C"}
+                                {loading
+                                    ? "--°C"
+                                    : weatherResult
+                                        ? `${Math.floor(weatherResult.current.temp_c)}°C`
+                                        : "--°C"}
                             </h3>
                         </div>
                         <div className="absolute inset-x-0 bottom-0 grid grid-cols-2 border-t border-violet-500 pt-3 text-violet-300">
@@ -124,7 +102,11 @@ function Weather() {
                                 </svg>
                                 <div>
                                     <p className="text-sm font-extrabold">
-                                        {weatherResult ? `${weatherResult.current.humidity}%` : "--%"}
+                                        {loading
+                                            ? "--%"
+                                            : weatherResult
+                                                ? `${weatherResult.current.humidity}%`
+                                                : "--%"}
                                     </p>
                                     <p className="text-sm font-medium">Nem</p>
                                 </div>
@@ -148,7 +130,11 @@ function Weather() {
                                 </svg>
                                 <div>
                                     <p className="text-sm font-extrabold">
-                                        {weatherResult ? `${weatherResult.current.wind_kph} km/h` : "-- km/h"}
+                                        {loading
+                                            ? "-- km/h"
+                                            : weatherResult
+                                                ? `${weatherResult.current.wind_kph} km/h`
+                                                : "-- km/h"}
                                     </p>
                                     <p className="text-sm font-medium">Rüzgar</p>
                                 </div>

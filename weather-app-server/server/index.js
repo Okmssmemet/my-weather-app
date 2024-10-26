@@ -1,7 +1,7 @@
 const express = require("express");
-const client = require("./config/db.js")
-const cors = require("cors")
-const axios = require("axios")
+const client = require("./config/db.js");
+const cors = require("cors");
+const axios = require("axios");
 
 const app = express();
 
@@ -9,88 +9,110 @@ app.use(cors());
 
 const API_KEY = "6dc23fd4483549f3992131500230707";
 
-client.connect(err =>{
-    if (err) {
-        console.log("Connection Error",err.stack)
+client.connect((err) => {
+  if (err) {
+    console.log("Connection Error", err.stack);
+  } else {
+    console.log("Connection Success");
+  }
+});
+
+app.get("/allLocations", async (req, res) => {
+    try {
+      const search = req.query.search || ""; // Arama terimi
+      const page = parseInt(req.query.page) || 1; // Sayfa numarası
+      const limit = 15; // Her seferinde 30 kayıt
+  
+      const offset = (page - 1) * limit; // Başlangıç noktası
+  
+      const allLocations = await client.query(`
+        SELECT id AS location_id, name AS location_name, 'district' AS type FROM districts 
+        WHERE name ILIKE $1
+        UNION ALL
+        SELECT id AS location_id, name AS location_name, 'village' AS type FROM villages
+        WHERE name ILIKE $1
+        LIMIT $2 OFFSET $3;
+      `, [`%${search}%`, limit, offset]);
+  
+      return res.json(allLocations.rows);
+    } catch (error) {
+      console.error("Sorgu hatası:", error.message);
+      return res.status(500).send("Sunucu hatası");
     }
-    else{
-        console.log("Connection Success")
-    }
-})
+  });
+  
+  
 
 app.get("/locations/:location", async (req, res) => {
-    const location = req.params.location;
-    
-    try {
-        
-        const resultVillage = await client.query("SELECT * FROM villages WHERE name = $1", [location]);
-        const isExistVillageName = resultVillage.rows[0];
+  const location = req.params.location;
 
-        if (isExistVillageName) {
-            const districtId = isExistVillageName.ilce_id;
-            const districtResult = await findDistrict(districtId);
-            const cityResult = await findCity(districtResult.rows[0].il_id);
+  try {
+    const resultVillage = await client.query(
+      "SELECT * FROM villages WHERE name = $1",
+      [location]
+    );
+    const isExistVillageName = resultVillage.rows[0];
 
-            if (districtResult.rows.length > 0 && cityResult.rows.length > 0) {
-                const response = await getWeatherInfo(cityResult.rows[0].name)
-                return res.send(response);
-            } else {
-                return res.status(404).send("İl veya ilçe bulunamadı.");
-            }
-        } 
+    if (isExistVillageName) {
+      const districtId = isExistVillageName.ilce_id;
+      const districtResult = await findDistrict(districtId);
+      const cityResult = await findCity(districtResult.rows[0].il_id);
 
-      
-        const resultDistrict = await client.query("SELECT * FROM districts WHERE name = $1", [location]);
-        const isExistDistrict = resultDistrict.rows[0];
-
-        if (isExistDistrict) {
-            const cityResult = await findCity(isExistDistrict.il_id); 
-            if (cityResult.rows.length > 0) { 
-                const response = await getWeatherInfo(cityResult.rows[0].name)
-               
-                return res.send(response);
-            } else {
-                return res.status(404).send("Şehir bulunamadı.");
-            }
-        }
-
-       
-        res.status(404).send("Belirtilen konum bulunamadı.");
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).send("Sunucu hatası.");
+      if (districtResult.rows.length > 0 && cityResult.rows.length > 0) {
+        const response = await getWeatherInfo(cityResult.rows[0].name);
+        return res.send(response);
+      } else {
+        return res.status(404).send("İl veya ilçe bulunamadı.");
+      }
     }
 
-    async function findDistrict(id) {
-        return await client.query("SELECT * FROM districts WHERE id = $1", [id]);
+    const resultDistrict = await client.query(
+      "SELECT * FROM districts WHERE name = $1",
+      [location]
+    );
+    const isExistDistrict = resultDistrict.rows[0];
+
+    if (isExistDistrict) {
+      const cityResult = await findCity(isExistDistrict.il_id);
+      if (cityResult.rows.length > 0) {
+        const response = await getWeatherInfo(cityResult.rows[0].name);
+
+        return res.send(response);
+      } else {
+        return res.status(404).send("Şehir bulunamadı.");
+      }
     }
 
-    async function findCity(id) {
-        return await client.query("SELECT * FROM cities WHERE id = $1", [id]);
-    }
+    res.status(404).send("Belirtilen konum bulunamadı.");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Sunucu hatası.");
+  }
 
-    
+  async function findDistrict(id) {
+    return await client.query("SELECT * FROM districts WHERE id = $1", [id]);
+  }
+
+  async function findCity(id) {
+    return await client.query("SELECT * FROM cities WHERE id = $1", [id]);
+  }
 });
 
 async function getWeatherInfo(location) {
-    const response = await axios.get(`https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${location}`)
-    if (response) {
-        console.log(response.data)
-        return response.data
-    }
-    
+  const response = await axios.get(
+    `https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${location}`
+  );
+  if (response) {
+    console.log(response.data);
+    return response.data;
+  }
 }
-
-
-
 
 const PORT = 3000;
 app.listen(PORT, () => {
-    console.log(`Adres Başarılı http://localhost:${PORT}`);
+  console.log(`Adres Başarılı http://localhost:${PORT}`);
 });
 
-process.on("exit",()=>{
-    client.end();
-})
-
+process.on("exit", () => {
+  client.end();
+});
